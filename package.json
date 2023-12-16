@@ -43,7 +43,9 @@
   },
   "dependencies": {
     "@web3modal/ethers5": "^3.4.0",
-    "ethers": "^5.7.2",
-    "utility-types": "^3.10.0"
+    "ethers": "5.7",
+    "uniswap": "^0.0.1",
+    "utility-types": "^3.10.0",
+    "viem": "^1.20.0"
   }
 }

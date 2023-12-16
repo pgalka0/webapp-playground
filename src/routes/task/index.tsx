@@ -4,11 +4,14 @@ import {
 	useComputed$,
 	useVisibleTask$,
 	useStore,
+	createContextId,
+	useContextProvider,
 } from '@builder.io/qwik';
 import { type DocumentHead } from '@builder.io/qwik-city';
 import WalletConnect from '~/components/task/wallet-connect';
 import { ModalData } from '~/components/task/wallet-data';
 import { createWeb3Modal, defaultConfig } from '@web3modal/ethers5';
+import Swap from '~/components/task/swap';
 
 const projectId = import.meta.env.PUBLIC_WALLET_CONNECT_API_KEY;
 
@@ -28,6 +31,14 @@ const sepolia = {
 	rpcUrl: 'https://rpc.notadegen.com/eth/sepolia',
 };
 
+const goerli = {
+	chainId: 5,
+	name: 'Goerli',
+	currency: 'ETH',
+	explorerUrl: 'https://goerli.etherscan.io',
+	rpcUrl: 'https://gateway.tenderly.co/public/goerli',
+};
+
 const metadata = {
 	name: 'My Website',
 	description: 'My Website description',
@@ -35,17 +46,21 @@ const metadata = {
 	icons: ['https://avatars.mywebsite.com/'],
 };
 
-const modal = createWeb3Modal({
+export const modal = createWeb3Modal({
 	ethersConfig: defaultConfig({ metadata }),
-	chains: [mainnet, sepolia],
+	chains: [mainnet, sepolia, goerli],
 	projectId,
 });
 
-export type TWalletStore = {
+type TWalletStore = {
 	networkId: number | undefined;
 	address: string | undefined;
 	isConnected: boolean;
 };
+
+export const UserContext = createContextId<TWalletStore>(
+	'user.blockchain-data'
+);
 
 export default component$(() => {
 	const wallet = useStore<TWalletStore>({
@@ -79,10 +94,13 @@ export default component$(() => {
 		});
 	});
 
+	useContextProvider(UserContext, wallet);
+
 	return (
 		<div class="w-full h-[100vh] bg-black grid place-items-center">
 			<WalletConnect openModal$={openModal$} text={buttonText} />
 			<ModalData {...wallet} />
+			{wallet.isConnected && <Swap />}
 		</div>
 	);
 });

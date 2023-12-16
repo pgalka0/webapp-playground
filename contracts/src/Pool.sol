@@ -1,74 +1,52 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.20;
 pragma abicoder v2;
 
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "../libraries/TransferHelper.sol";
-import "../interfaces/INonfungiblePositionManager.sol";
-import "../base/LiquidityManagement.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
-contract LiquidityExamples is IERC721Receiver {
-    address public constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+// IMPORTANT: THIS WORKS ONLY ON GOERLI
 
-    uint24 public constant poolFee = 3000;
+contract Swap {
+    address private constant routerAddress =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-    INonfungiblePositionManager public immutable nonfungiblePositionManager;
+    ISwapRouter public immutable swapRouter = ISwapRouter(routerAddress);
 
-    /// @notice Represents the deposit of an NFT
-    struct Deposit {
-        address owner;
-        uint128 liquidity;
-        address token0;
-        address token1;
-    }
+    uint24 public constant poolFee = 10000;
 
-    /// @dev deposits[tokenId] => Deposit
-    mapping(uint256 => Deposit) public deposits;
+    constructor() {}
 
-    constructor(INonfungiblePositionManager _nonfungiblePositionManager) {
-        nonfungiblePositionManager = _nonfungiblePositionManager;
-    }
+    function swap(
+        address tokenIn,
+        address tokenOut,
+        uint256 amount
+    ) external returns (uint256 amountOut) {
+        uint256 allowance = IERC20(tokenIn).allowance(
+            msg.sender,
+            address(this)
+        );
 
-    // Implementing `onERC721Received` so this contract can receive custody of erc721 tokens
-    function onERC721Received(
-        address operator,
-        address,
-        uint256 tokenId,
-        bytes calldata
-    ) external override returns (bytes4) {
-        // get position information
+        require(allowance >= amount, "Not enough allowance");
 
-        _createDeposit(operator, tokenId);
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amount);
 
-        return this.onERC721Received.selector;
-    }
+        IERC20(tokenIn).approve(address(swapRouter), amount);
 
-    function _createDeposit(address owner, uint256 tokenId) internal {
-        (
-            ,
-            ,
-            address token0,
-            address token1,
-            ,
-            ,
-            ,
-            uint128 liquidity,
-            ,
-            ,
-            ,
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                fee: poolFee,
+                recipient: msg.sender,
+                deadline: block.timestamp,
+                amountIn: amount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
 
-        ) = nonfungiblePositionManager.positions(tokenId);
+        amountOut = swapRouter.exactInputSingle(params);
 
-        // set the owner and data for position
-        // operator is msg.sender
-        deposits[tokenId] = Deposit({
-            owner: owner,
-            liquidity: liquidity,
-            token0: token0,
-            token1: token1
-        });
+        return amountOut;
     }
 }
